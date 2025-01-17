@@ -1,5 +1,3 @@
-package create_rdd;
-
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.junit.jupiter.api.BeforeAll;
