@@ -20,12 +20,73 @@ public class RankingCoursesJob {
         JavaPairRDD<Integer, Integer> chapterData = setUpChapterDataRdd(sc, testMode);
         JavaPairRDD<Integer, String> titleData = setUpTitlesDataRdd(sc, testMode);
 
-        //calculate total chapters for the each course
-        JavaPairRDD<Integer, Integer> chaptersPerCourse = chapterData
+        // step-1: calculate total chapters for the each course
+        JavaPairRDD<Integer, Integer> chaptersPerCourseRdd = chapterData
                 .mapToPair(Tuple2::swap)
                 .mapToPair(x -> new Tuple2<>(x._1, 1))
                 .reduceByKey(Integer::sum);
-        chaptersPerCourse.collect().forEach(System.out::println);
+//        chaptersPerCourse.collect().forEach(System.out::println);
+
+        // remove any duplicated views
+        viewData = viewData.distinct();
+
+        // step-2: get the course ids into the RDD
+        viewData = viewData.mapToPair(row -> new Tuple2<Integer, Integer>(row._2, row._1));
+        JavaPairRDD<Integer, Tuple2<Integer, Integer>> joinedRdd = viewData.join(chapterData);
+
+        //step-3: don't need chapterIds anymore, setting up for a reduce
+        JavaPairRDD<Tuple2<Integer, Integer>, Long> step3 = joinedRdd.mapToPair(row -> {
+                    Integer userId = row._2._1;
+                    Integer courseId = row._2._2;
+                    return new Tuple2<>(new Tuple2<>(userId, courseId), 1L);
+                }
+        );
+
+        // step-4: count how many views for each users per course
+        step3 = step3.reduceByKey(Long::sum);
+
+        // step-5: Don't need any userIds
+        JavaPairRDD<Integer, Long> step5 = step3.mapToPair(row -> {
+                    Integer courseId = row._1._2;
+                    Long views = row._2;
+                    return new Tuple2<>(courseId, views);
+                }
+        );
+
+        // step-6: Add in the total chapter count
+        JavaPairRDD<Integer, Tuple2<Long, Integer>> step6 = step5.join(chaptersPerCourseRdd);
+
+        // step-7: Calculate the percentage (courseId, percentage)
+        JavaPairRDD<Integer, Double> step7 = step6.mapToPair(row -> {
+            Integer courseId = row._1;
+            Double percentageWatched = ((double) row._2._1 / row._2._2);
+            return new Tuple2<>(courseId, percentageWatched);
+        });
+
+        // step-8: Calculate the score (courseId, score)
+        JavaPairRDD<Integer, Long> step8 = step7.mapToPair(row -> {
+            Integer courseId = row._1;
+            long score = 0L;
+            Double percent = row._2;
+            if (percent > 0.9) {
+                score = 10L;
+            } else if (percent > 0.5) {
+                score = 4L;
+            } else if (percent > 0.25) {
+                score = 2L;
+            }
+            return new Tuple2<>(courseId, score);
+        });
+
+        // step-9 reduce by key to get the final total scores
+        step8 = step8.reduceByKey(Long::sum);
+
+        // step-10 reduce by key to get the final total scores (views,courseId)
+        JavaPairRDD<Long, Integer> step10 = step8.mapToPair(row -> new Tuple2<>(row._2, row._1));
+
+        // sort by key to get the one with the higher value first
+        step10.sortByKey(false).collect().forEach(System.out::println);
+
         sc.close();
     }
 
