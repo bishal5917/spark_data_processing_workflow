@@ -87,6 +87,7 @@ public class RankingCoursesJob {
         // sort by key to get the one with the higher value first
         step10.sortByKey(false).collect().forEach(System.out::println);
 
+
         sc.close();
     }
 
