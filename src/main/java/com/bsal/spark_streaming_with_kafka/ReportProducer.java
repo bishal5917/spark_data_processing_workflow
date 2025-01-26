@@ -28,7 +28,7 @@ public class ReportProducer {
         // by 24x to give a one hour simulation....
         Producer<String, String> producer = new KafkaProducer<>(props);
 
-        Scanner sc = new Scanner(new FileReader("src/main/resources/final_viewing_figures"));
+        Scanner sc = new Scanner(new FileReader("src/main/resources/watchtime_record.txt"));
         int milliseconds = 0;
         while (sc.hasNextLine()) {
             String[] input = sc.nextLine().split(",");
@@ -44,7 +44,7 @@ public class ReportProducer {
             }
 
             String courseName = courseKeys.get(courseKey);
-            producer.send(new ProducerRecord<String, String>("report", courseName));
+            producer.send(new ProducerRecord<String, String>("watchreport", courseName));
         }
         sc.close();
         producer.close();
